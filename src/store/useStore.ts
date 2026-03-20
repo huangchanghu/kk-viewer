@@ -14,8 +14,16 @@ interface AppState {
   startEditConfig: () => void;
   cancelEditConfig: () => void;
 
+  // Pinned Lists
+  pinnedLists: string[];
+  loadPinnedLists: () => Promise<void>;
+  pinList: (listId: string) => Promise<void>;
+  unpinList: (listId: string) => Promise<void>;
+  isPinned: (listId: string) => boolean;
+
   // Navigation
   currentPath: NavItem[];
+  buildPathForList: (listId: string) => NavItem[];
   navigateTo: (item: NavItem | null) => void;
   navigateBack: () => void;
 
@@ -53,10 +61,14 @@ export const useStore = create<AppState>((set, get) => ({
   configLoading: true,
   isEditingConfig: false,
 
+  // Pinned Lists
+  pinnedLists: [],
+
   loadConfig: async () => {
     set({ configLoading: true });
     const config = await storage.getConfig();
-    set({ config, configLoading: false });
+    const pinnedLists = await storage.getPinnedLists();
+    set({ config, configLoading: false, pinnedLists });
   },
 
   setConfig: async (config: Config) => {
@@ -78,6 +90,7 @@ export const useStore = create<AppState>((set, get) => ({
       bookmarks: [],
       currentPath: [],
       currentListId: null,
+      pinnedLists: [],
     });
   },
 
@@ -85,8 +98,49 @@ export const useStore = create<AppState>((set, get) => ({
 
   cancelEditConfig: () => set({ isEditingConfig: false }),
 
+  // Pinned Lists
+  loadPinnedLists: async () => {
+    const pinnedLists = await storage.getPinnedLists();
+    set({ pinnedLists });
+  },
+
+  pinList: async (listId: string) => {
+    await storage.addPinnedList(listId);
+    const pinnedLists = await storage.getPinnedLists();
+    set({ pinnedLists });
+  },
+
+  unpinList: async (listId: string) => {
+    await storage.removePinnedList(listId);
+    const pinnedLists = await storage.getPinnedLists();
+    set({ pinnedLists });
+  },
+
+  isPinned: (listId: string) => {
+    return get().pinnedLists.includes(listId);
+  },
+
   // Navigation
   currentPath: [],
+
+  // Build full path for a list based on its parentId hierarchy
+  buildPathForList: (listId: string): NavItem[] => {
+    const { allLists } = get();
+    const path: NavItem[] = [];
+    let currentId: string | null = listId;
+
+    while (currentId) {
+      const list = allLists.find(l => l.id === currentId);
+      if (list) {
+        path.unshift({ id: list.id, name: list.name, icon: list.icon });
+        currentId = list.parentId;
+      } else {
+        break;
+      }
+    }
+
+    return path;
+  },
 
   navigateTo: (item: NavItem | null) => {
     if (item === null) {
@@ -99,14 +153,26 @@ export const useStore = create<AppState>((set, get) => ({
         cursor: null,
         hasMore: false,
       });
+    } else if (!item.id) {
+      // item.id is null, navigate to root
+      set({
+        currentPath: [],
+        currentListId: null,
+        isSearchMode: false,
+        bookmarks: [],
+        cursor: null,
+        hasMore: false,
+      });
     } else {
+      // Build full path based on list hierarchy
+      const fullPath = get().buildPathForList(item.id);
       const currentPath = get().currentPath;
       const existingIndex = currentPath.findIndex(p => p.id === item.id);
-      if (existingIndex >= 0) {
-        // Navigate to existing path item - clear bookmarks first
-        const newPath = currentPath.slice(0, existingIndex + 1);
+
+      if (existingIndex >= 0 && existingIndex === fullPath.length - 1 &&
+          fullPath.every((p: NavItem, i: number) => p.id === currentPath[i]?.id)) {
+        // Already at this path, just clear bookmarks
         set({
-          currentPath: newPath,
           currentListId: item.id,
           isSearchMode: false,
           bookmarks: [],
@@ -114,9 +180,9 @@ export const useStore = create<AppState>((set, get) => ({
           hasMore: false,
         });
       } else {
-        // Navigate to new item - clear bookmarks first
+        // Navigate to new path - clear bookmarks first
         set({
-          currentPath: [...currentPath, item],
+          currentPath: fullPath,
           currentListId: item.id,
           isSearchMode: false,
           bookmarks: [],

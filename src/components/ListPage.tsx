@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Breadcrumb } from './Breadcrumb';
 import { SearchBar } from './SearchBar';
 import { BookmarkList } from './BookmarkList';
 import type { ZBookmarkList, NavItem } from '../types';
@@ -25,6 +24,10 @@ export function ListPage() {
     loadMoreSearch,
     clearError,
     resetSearch,
+    pinnedLists,
+    pinList,
+    unpinList,
+    isPinned,
   } = useStore();
 
   // Only load lists on mount, bookmarks are loaded by navigateTo
@@ -45,6 +48,14 @@ export function ListPage() {
   const childLists = currentListId ? getChildLists() : getRootLists();
   const isRootPage = currentListId === null;
 
+  // Get pinned lists that exist in allLists
+  const getPinnedLists = (): ZBookmarkList[] => {
+    return allLists.filter((list) => pinnedLists.includes(list.id));
+  };
+
+  const pinnedListsData = getPinnedLists();
+  const currentListPinned = currentListId ? isPinned(currentListId) : false;
+
   const handleListClick = (list: ZBookmarkList) => {
     const navItem: NavItem = {
       id: list.id,
@@ -52,6 +63,17 @@ export function ListPage() {
       icon: list.icon,
     };
     navigateTo(navItem);
+  };
+
+  const handlePinClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (currentListId) {
+      if (currentListPinned) {
+        unpinList(currentListId);
+      } else {
+        pinList(currentListId);
+      }
+    }
   };
 
   const handleHomeClick = () => {
@@ -109,12 +131,95 @@ export function ListPage() {
       {/* Breadcrumb */}
       {!isSearchMode && currentPath.length > 0 && (
         <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <Breadcrumb />
+          <div className="flex items-center gap-1 text-sm overflow-x-auto py-1">
+            <button
+              onClick={handleHomeClick}
+              className="text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+            >
+              首页
+            </button>
+            {currentPath.map((item, index) => (
+              <div key={item.id || index} className="flex items-center gap-1 shrink-0">
+                <span className="text-gray-400 dark:text-gray-500">/</span>
+                {item.icon && <span>{item.icon}</span>}
+                <button
+                  onClick={() => navigateTo(item)}
+                  className={`hover:underline ${
+                    index === currentPath.length - 1
+                      ? 'text-gray-900 dark:text-white font-medium'
+                      : 'text-blue-600 dark:text-blue-400'
+                  }`}
+                >
+                  {item.name}
+                </button>
+                {index === currentPath.length - 1 && currentListId && (
+                  <button
+                    onClick={handlePinClick}
+                    className={`ml-1 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 ${
+                      currentListPinned ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
+                    }`}
+                    title={currentListPinned ? '取消固定' : '将列表固定到首页'}
+                  >
+                    {currentListPinned ? (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4H7V2H17V4H16V12L18 14V16H12.8V22H11.2V16H6V14L8 12V4Z" />
+                      </svg>
+                    )}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Content - Scrollable container */}
       <div className="flex-1 overflow-y-auto flex flex-col">
+        {/* Pinned Lists - only show on root page */}
+        {!isSearchMode && isRootPage && pinnedListsData.length > 0 && (
+          <div className="border-b border-gray-200 dark:border-gray-700 shrink-0">
+            <div className="px-4 py-2">
+              <div className="space-y-1">
+                {pinnedListsData.map((list) => (
+                  <div key={list.id} className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleListClick(list)}
+                      className="flex-1 text-left px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                    >
+                      <span>{list.icon}</span>
+                      <span className="text-sm text-gray-900 dark:text-white">{list.name}</span>
+                      <svg
+                        className="w-4 h-4 text-gray-400 ml-auto"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        unpinList(list.id);
+                      }}
+                      className="p-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                      title="取消固定"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Child Lists - show on root page or when not in search mode */}
         {(!isSearchMode || isRootPage) && childLists.length > 0 && (
           <div className="border-b border-gray-200 dark:border-gray-700 shrink-0">
