@@ -25,6 +25,18 @@ export function BookmarkList({ bookmarks, hasMore, onLoadMore, loading }: Bookma
     return '未知标题';
   };
 
+  const getFaviconUrl = (bookmark: Bookmark): string => {
+    if (bookmark.content?.type === 'link' && bookmark.content.url) {
+      try {
+        const hostname = new URL(bookmark.content.url).hostname;
+        return `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+      } catch {
+        return '';
+      }
+    }
+    return '';
+  };
+
   const getHostname = (bookmark: Bookmark): string => {
     if (bookmark.content?.type === 'link' && bookmark.content.url) {
       try {
@@ -60,12 +72,24 @@ export function BookmarkList({ bookmarks, hasMore, onLoadMore, loading }: Bookma
             className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
           >
             <div className="flex items-center justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                  {getDisplayTitle(bookmark)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {getHostname(bookmark)}
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {getFaviconUrl(bookmark) && (
+                  <img
+                    src={getFaviconUrl(bookmark)}
+                    alt=""
+                    className="w-4 h-4 shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                )}
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    {getDisplayTitle(bookmark)}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {getHostname(bookmark)}
+                  </div>
                 </div>
               </div>
               <svg
