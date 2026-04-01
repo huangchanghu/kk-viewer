@@ -166,30 +166,15 @@ export const useStore = create<AppState>((set, get) => ({
     } else {
       // Build full path based on list hierarchy
       const fullPath = get().buildPathForList(item.id);
-      const currentPath = get().currentPath;
-      const existingIndex = currentPath.findIndex(p => p.id === item.id);
-
-      if (existingIndex >= 0 && existingIndex === fullPath.length - 1 &&
-          fullPath.every((p: NavItem, i: number) => p.id === currentPath[i]?.id)) {
-        // Already at this path, just clear bookmarks
-        set({
-          currentListId: item.id,
-          isSearchMode: false,
-          bookmarks: [],
-          cursor: null,
-          hasMore: false,
-        });
-      } else {
-        // Navigate to new path - clear bookmarks first
-        set({
-          currentPath: fullPath,
-          currentListId: item.id,
-          isSearchMode: false,
-          bookmarks: [],
-          cursor: null,
-          hasMore: false,
-        });
-      }
+      // Navigate to the target path - always update currentPath from fullPath
+      set({
+        currentPath: fullPath,
+        currentListId: item.id,
+        isSearchMode: false,
+        bookmarks: [],
+        cursor: null,
+        hasMore: false,
+      });
       // Load bookmarks for this list (item.id is guaranteed to be string in this branch)
       if (item.id) {
         get().loadBookmarks(item.id);
