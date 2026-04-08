@@ -262,13 +262,21 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   search: async (query: string, newCursor?: string) => {
-    const { config } = get();
+    const { config, currentListId, allLists } = get();
     if (!config || !query.trim()) return;
 
     set({ loading: true, error: null, isSearchMode: true, searchQuery: query });
     try {
       const client = new KarakeepClient(config);
-      const response = await client.searchBookmarks(query, newCursor);
+      // Append list: qualifier when searching within a list
+      let apiQuery = query;
+      if (currentListId) {
+        const currentList = allLists.find(l => l.id === currentListId);
+        if (currentList) {
+          apiQuery = `${query} list:"${currentList.name}"`;
+        }
+      }
+      const response = await client.searchBookmarks(apiQuery, newCursor);
 
       // Filter only link type bookmarks
       const linkBookmarks = response.bookmarks.filter(b => b.content?.type === 'link');

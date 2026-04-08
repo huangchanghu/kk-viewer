@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 
 export function SearchBar() {
-  const { search, resetSearch, isSearchMode, loading } = useStore();
+  const { search, resetSearch, isSearchMode, loading, currentListId, currentPath } = useStore();
+  const currentListName = currentListId ? currentPath[currentPath.length - 1]?.name : null;
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export function SearchBar() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索书签..."
+            placeholder={currentListName ? `在"${currentListName}"中搜索...` : '搜索所有书签...'}
             className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
           />
           <svg
