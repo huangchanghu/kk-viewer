@@ -29,6 +29,7 @@ Single Zustand store at `src/store/useStore.ts` manages:
 - **Data**: `allLists` (all lists from API), `bookmarks` for current list
 - **Search**: Separate `searchResults` and `searchCursor` for search mode
 - **UI**: `loading`, `error`, `isSearchMode` states
+- **Vim**: `focusedIndex`, `vimMode` ('normal'|'insert'), `isHelpOpen`
 
 Key navigation logic: `navigateTo(item)` handles both entering a list and breadcrumb clicks. Root page (`currentListId === null`) shows only root lists, no bookmarks.
 
@@ -45,11 +46,20 @@ Key navigation logic: `navigateTo(item)` handles both entering a list and breadc
 4. Navigate to list → `navigateTo()` clears bookmarks, then `loadBookmarks(listId)`
 5. Search → `search()` sets `isSearchMode: true`, uses separate `searchResults` state
 
+### Vim Keybindings
+`src/hooks/useVimKeybindings.ts` — modal keyboard system used by `ListPage`:
+- **Normal mode** (default): all vim shortcuts active; `Esc` closes popup
+- **Insert mode**: search input focused, only `Esc` is captured (returns to Normal)
+- Builds a flat `FocusableItem[]` list from pinned lists + child lists + bookmarks (or search results), keyed by global index
+- Item refs registered via a shared `Map<number, HTMLElement>` (`itemRefs`); scroll fires in a `useEffect` after render so refs are fresh
+- Scroll only triggers when the focused element is outside the scroll container's visible rect
+
 ### Types
 `src/types.ts` contains all TypeScript interfaces matching Karakeep API schema:
 - `ZBookmarkList` - List with id, name, icon, parentId (for hierarchy), type (manual/smart)
 - `Bookmark` - Bookmark with title, content (link/text/asset), tags, assets
 - `Config` - API URL and Key
+- `FocusableItem` - Union type `{ type: 'list'; data: ZBookmarkList } | { type: 'bookmark'; data: Bookmark }`
 
 ## Key Implementation Details
 
@@ -57,6 +67,8 @@ Key navigation logic: `navigateTo(item)` handles both entering a list and breadc
 - **List hierarchy**: Lists have `parentId` (null for root), child lists computed by filtering `allLists`
 - **Navigation clears state**: `navigateTo()` clears bookmarks before loading to prevent stale content flicker
 - **Search is global**: No list-scoped search API available, search always queries all bookmarks
+- **Vim mode indicator**: Header shows NORMAL/INSERT badge reflecting current mode
+- **focusedIndex resets**: `navigateTo()`, `navigateBack()`, and new search results all reset `focusedIndex` to 0
 
 ## Karakeep API Reference
 

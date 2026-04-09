@@ -45,6 +45,14 @@ interface AppState {
   error: string | null;
   isSearchMode: boolean;
 
+  // Vim State
+  focusedIndex: number;
+  vimMode: 'normal' | 'insert';
+  isHelpOpen: boolean;
+  setFocusedIndex: (index: number) => void;
+  setVimMode: (mode: 'normal' | 'insert') => void;
+  setHelpOpen: (open: boolean) => void;
+
   // Actions
   loadLists: () => Promise<void>;
   loadBookmarks: (listId: string, newCursor?: string) => Promise<void>;
@@ -152,6 +160,7 @@ export const useStore = create<AppState>((set, get) => ({
         bookmarks: [],
         cursor: null,
         hasMore: false,
+        focusedIndex: 0,
       });
     } else if (!item.id) {
       // item.id is null, navigate to root
@@ -162,6 +171,7 @@ export const useStore = create<AppState>((set, get) => ({
         bookmarks: [],
         cursor: null,
         hasMore: false,
+        focusedIndex: 0,
       });
     } else {
       // Build full path based on list hierarchy
@@ -174,6 +184,7 @@ export const useStore = create<AppState>((set, get) => ({
         bookmarks: [],
         cursor: null,
         hasMore: false,
+        focusedIndex: 0,
       });
       // Load bookmarks for this list (item.id is guaranteed to be string in this branch)
       if (item.id) {
@@ -193,6 +204,7 @@ export const useStore = create<AppState>((set, get) => ({
       bookmarks: [],
       cursor: null,
       hasMore: false,
+      focusedIndex: 0,
     });
     // Load bookmarks if navigating to a list (not root)
     if (lastItem?.id) {
@@ -217,6 +229,14 @@ export const useStore = create<AppState>((set, get) => ({
   loading: false,
   error: null,
   isSearchMode: false,
+
+  // Vim State
+  focusedIndex: 0,
+  vimMode: 'normal',
+  isHelpOpen: false,
+  setFocusedIndex: (index: number) => set({ focusedIndex: index }),
+  setVimMode: (mode: 'normal' | 'insert') => set({ vimMode: mode }),
+  setHelpOpen: (open: boolean) => set({ isHelpOpen: open }),
 
   loadLists: async () => {
     const { config } = get();
@@ -286,6 +306,7 @@ export const useStore = create<AppState>((set, get) => ({
         searchCursor: response.nextCursor,
         hasMoreSearch: !!response.nextCursor,
         loading: false,
+        ...(newCursor ? {} : { focusedIndex: 0 }),
       });
     } catch (err) {
       set({

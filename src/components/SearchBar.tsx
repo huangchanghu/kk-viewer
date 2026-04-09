@@ -1,19 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, forwardRef } from 'react';
 import { useStore } from '../store/useStore';
 
-export function SearchBar() {
+export const SearchBar = forwardRef<HTMLInputElement>(function SearchBar(_, ref) {
   const { search, resetSearch, isSearchMode, loading, currentListId, currentPath } = useStore();
   const currentListName = currentListId ? currentPath[currentPath.length - 1]?.name : null;
   const [query, setQuery] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    // Chrome extension popups need a short delay before focus works
-    const timer = setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -40,7 +31,7 @@ export function SearchBar() {
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <input
-            ref={inputRef}
+            ref={ref}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -77,4 +68,4 @@ export function SearchBar() {
       </div>
     </div>
   );
-}
+});

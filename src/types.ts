@@ -70,3 +70,7 @@ export interface NavItem {
   name: string;
   icon?: string;
 }
+
+export type FocusableItem =
+  | { type: 'list'; data: ZBookmarkList }
+  | { type: 'bookmark'; data: Bookmark };

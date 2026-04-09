@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { SearchBar } from './SearchBar';
 import { BookmarkList } from './BookmarkList';
-import type { ZBookmarkList, NavItem } from '../types';
+import { HelpPanel } from './HelpPanel';
+import { useVimKeybindings } from '../hooks/useVimKeybindings';
+import type { ZBookmarkList, NavItem, FocusableItem } from '../types';
 
 export function ListPage() {
   const {
@@ -28,7 +30,12 @@ export function ListPage() {
     pinList,
     unpinList,
     isPinned,
+    focusedIndex,
+    vimMode,
   } = useStore();
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const itemRefs = useRef<Map<number, HTMLElement>>(new Map());
 
   // Only load lists on mount, bookmarks are loaded by navigateTo
   useEffect(() => {
@@ -55,6 +62,43 @@ export function ListPage() {
 
   const pinnedListsData = getPinnedLists();
   const currentListPinned = currentListId ? isPinned(currentListId) : false;
+
+  // Build focusable items list
+  const focusableItems = useMemo((): FocusableItem[] => {
+    if (isSearchMode) {
+      return searchResults.map((b) => ({ type: 'bookmark' as const, data: b }));
+    }
+
+    const items: FocusableItem[] = [];
+    if (isRootPage) {
+      pinnedListsData.forEach((list) =>
+        items.push({ type: 'list', data: list }),
+      );
+      childLists.forEach((list) =>
+        items.push({ type: 'list', data: list }),
+      );
+    } else {
+      childLists.forEach((list) =>
+        items.push({ type: 'list', data: list }),
+      );
+      bookmarks.forEach((b) =>
+        items.push({ type: 'bookmark', data: b }),
+      );
+    }
+    return items;
+  }, [isSearchMode, searchResults, isRootPage, pinnedListsData, childLists, bookmarks]);
+
+  // Integrate vim keybindings
+  useVimKeybindings({
+    focusableItems,
+    searchInputRef,
+    itemRefs,
+  });
+
+  // Clear itemRefs map when focusableItems change
+  useEffect(() => {
+    itemRefs.current.clear();
+  }, [focusableItems]);
 
   const handleListClick = (list: ZBookmarkList) => {
     const navItem: NavItem = {
@@ -85,8 +129,71 @@ export function ListPage() {
   const displayHasMore = isSearchMode ? hasMoreSearch : hasMore;
   const handleLoadMore = isSearchMode ? loadMoreSearch : loadMore;
 
+  // Track global index offset for list items rendered before BookmarkList
+  const listItemCount = isSearchMode ? 0 : (isRootPage ? pinnedListsData.length + childLists.length : childLists.length);
+
+  const setListItemRef = useCallback(
+    (globalIndex: number, el: HTMLElement | null) => {
+      if (el) {
+        itemRefs.current.set(globalIndex, el);
+      } else {
+        itemRefs.current.delete(globalIndex);
+      }
+    },
+    [],
+  );
+
+  // Helper to determine if a global index is focused
+  const isFocused = (globalIndex: number) => globalIndex === focusedIndex;
+
+  // Render a list item button with focus support
+  const renderListItem = (list: ZBookmarkList, globalIndex: number, showUnpinButton?: boolean) => {
+    const focused = isFocused(globalIndex);
+    return (
+      <div key={list.id} className="flex items-center gap-2">
+        <button
+          ref={(el) => setListItemRef(globalIndex, el)}
+          onClick={() => handleListClick(list)}
+          className={`flex-1 text-left px-3 py-2 rounded-md transition-colors flex items-center gap-2 ${
+            focused
+              ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/30'
+              : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+        >
+          <span>{list.icon}</span>
+          <span className="text-sm text-gray-900 dark:text-white">{list.name}</span>
+          <svg
+            className="w-4 h-4 text-gray-400 ml-auto"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        {showUnpinButton && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              unpinList(list.id);
+            }}
+            className="p-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+            title="取消固定"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+            </svg>
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // Compute global index counters
+  let globalIndex = 0;
+
   return (
-    <div className="w-[360px] h-[500px] flex flex-col bg-white dark:bg-gray-800">
+    <div className="w-[360px] h-[500px] flex flex-col bg-white dark:bg-gray-800 relative">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <h1
@@ -95,18 +202,28 @@ export function ListPage() {
         >
           Karakeep
         </h1>
-        <button
-          onClick={startEditConfig}
-          className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          title="设置"
-        >
-          设置
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Vim mode indicator */}
+          <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${
+            vimMode === 'normal'
+              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+          }`}>
+            {vimMode === 'normal' ? 'NORMAL' : 'INSERT'}
+          </span>
+          <button
+            onClick={startEditConfig}
+            className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            title="设置"
+          >
+            设置
+          </button>
+        </div>
       </div>
 
       {/* Search */}
       <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0">
-        <SearchBar />
+        <SearchBar ref={searchInputRef} />
       </div>
 
       {/* Error Toast */}
@@ -186,37 +303,10 @@ export function ListPage() {
           <div className="border-b border-gray-200 dark:border-gray-700 shrink-0">
             <div className="px-4 py-2">
               <div className="space-y-1">
-                {pinnedListsData.map((list) => (
-                  <div key={list.id} className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleListClick(list)}
-                      className="flex-1 text-left px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                    >
-                      <span>{list.icon}</span>
-                      <span className="text-sm text-gray-900 dark:text-white">{list.name}</span>
-                      <svg
-                        className="w-4 h-4 text-gray-400 ml-auto"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        unpinList(list.id);
-                      }}
-                      className="p-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-                      title="取消固定"
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
+                {pinnedListsData.map((list) => {
+                  const idx = globalIndex++;
+                  return renderListItem(list, idx, true);
+                })}
               </div>
             </div>
           </div>
@@ -230,24 +320,10 @@ export function ListPage() {
                 {isRootPage ? '' : '列表'}
               </div>
               <div className="space-y-1">
-                {childLists.map((list) => (
-                  <button
-                    key={list.id}
-                    onClick={() => handleListClick(list)}
-                    className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                  >
-                    <span>{list.icon}</span>
-                    <span className="text-sm text-gray-900 dark:text-white">{list.name}</span>
-                    <svg
-                      className="w-4 h-4 text-gray-400 ml-auto"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                ))}
+                {childLists.map((list) => {
+                  const idx = globalIndex++;
+                  return renderListItem(list, idx);
+                })}
               </div>
             </div>
           </div>
@@ -269,6 +345,9 @@ export function ListPage() {
                 hasMore={displayHasMore}
                 onLoadMore={handleLoadMore}
                 loading={loading}
+                focusedIndex={focusedIndex}
+                indexOffset={listItemCount}
+                itemRefs={itemRefs}
               />
             )}
           </div>
@@ -287,11 +366,17 @@ export function ListPage() {
                 hasMore={displayHasMore}
                 onLoadMore={handleLoadMore}
                 loading={loading}
+                focusedIndex={focusedIndex}
+                indexOffset={0}
+                itemRefs={itemRefs}
               />
             )}
           </div>
         )}
       </div>
+
+      {/* Help Panel Overlay */}
+      <HelpPanel />
     </div>
   );
 }

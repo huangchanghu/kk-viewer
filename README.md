@@ -9,6 +9,7 @@
 - 书签搜索功能
 - 支持深色/浅色主题（跟随浏览器）
 - 分页加载书签
+- Vim 风格键盘快捷键（可纯键盘操作）
 
 ## 安装
 
@@ -44,6 +45,25 @@ npm run build
 - **API URL**: 你的 Karakeep 实例地址（如 `https://karakeep.example.com`）
 - **API Key**: 在 Karakeep 设置中生成的 API Key（格式：`ak2_xxx_xxx`）
 
+## 键盘快捷键
+
+扩展支持 Vim 风格的键盘操作，分为 **Normal** 和 **Insert** 两种模式（头部有模式指示器）。
+
+| 快捷键 | 功能 |
+|--------|------|
+| `j` / `k` | 上下移动焦点（支持数字前缀，如 `5j`） |
+| `Enter` | 进入列表 / 新标签页打开书签 |
+| `l` | 进入列表（焦点在书签上时无操作） |
+| `h` / `Backspace` | 返回上级列表 |
+| `o` | 当前标签页打开书签 |
+| `O` | 新标签页打开书签 |
+| `gg` | 跳到顶部 |
+| `G` | 跳到底部（`5G` 跳到第 5 项） |
+| `/` / `i` | 进入 Insert 模式（聚焦搜索框） |
+| `Esc` | Insert → Normal；Normal → 关闭弹窗 |
+| `p` | Pin / Unpin 当前焦点列表 |
+| `?` | 显示 / 关闭快捷键帮助面板 |
+
 ## 技术栈
 
 - React 18
@@ -60,14 +80,15 @@ kk-viewer/
 ├── src/
 │   ├── popup/           # 弹窗页面
 │   ├── components/      # React 组件
-│   ├── api/            # API 客户端
-│   ├── store/          # 状态管理
-│   └── utils/          # 工具函数
+│   ├── hooks/           # 自定义 Hook（vim 快捷键）
+│   ├── api/             # API 客户端
+│   ├── store/           # 状态管理
+│   └── utils/           # 工具函数
 ├── public/
-│   └── icons/          # 扩展图标
-├── manifest.json       # 扩展清单
+│   └── icons/           # 扩展图标
+├── manifest.json        # 扩展清单
 └── docs/
-    └── SPEC-RFC.md     # 需求规格文档
+    └── spec-vim-keybindings.md  # Vim 快捷键需求规格文档
 ```
 
 ## License
